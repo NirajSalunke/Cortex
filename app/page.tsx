@@ -1,6 +1,5 @@
 import Model from "@/components/Model";
 import { ModeToggle } from "@/components/Modetoggle";
-// import { ModeToggle } from "@/components/Modetoggle";
 import Navbar from "@/components/Navbar";
 
 const page = () => {
@@ -10,7 +9,6 @@ const page = () => {
       <div className="w-screen h-screen overflow-hidden">
         <Model />
       </div>
-      {/* <ModeToggle /> */}
     </div>
   );
 };
