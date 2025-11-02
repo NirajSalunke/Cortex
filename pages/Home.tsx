@@ -1,10 +1,8 @@
 import Model from "@/components/Model";
 
-import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
-import { Link } from "lucide-react";
-import React from "react";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
+import Link from "next/link";
 
 const Home = () => {
   return (
