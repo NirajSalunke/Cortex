@@ -1,0 +1,157 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Change to "mysql" or "sqlite" if needed
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USER ====================
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String    @unique
+  name          String?
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  projectMembers ProjectMember[]
+  pages          Page[]
+  kanbanCards    KanbanCard[]
+  activities     Activity[]
+}
+
+// ==================== PROJECT ====================
+model Project {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  icon          String?
+  color         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  members       ProjectMember[]
+  pages         Page[]
+  boards        Board[]
+  activities    Activity[]
+}
+
+// ==================== PROJECT MEMBERS & ROLES ====================
+model ProjectMember {
+  id         String       @id @default(cuid())
+  userId     String
+  projectId  String
+  role       ProjectRole  @default(VIEWER)
+  joinedAt   DateTime     @default(now())
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+// ==================== PAGES (DOCUMENTATION) ====================
+model Page {
+  id               String    @id @default(cuid())
+  title            String
+  liveblocksRoomId String    @unique // Links to Liveblocks room
+  parentId         String?   // For nested pages
+  projectId        String
+  authorId         String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author       User      @relation(fields: [authorId], references: [id])
+  parent       Page?     @relation("PageHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children     Page[]    @relation("PageHierarchy")
+  linkedCards  KanbanCard[]
+
+  @@index([projectId])
+  @@index([authorId])
+}
+
+// ==================== KANBAN BOARDS ====================
+model Board {
+  id         String   @id @default(cuid())
+  name       String
+  projectId  String
+  columns    Json     // Stores: ["To Do", "In Progress", "Done"]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards      KanbanCard[]
+
+  @@index([projectId])
+}
+
+// ==================== KANBAN CARDS ====================
+model KanbanCard {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?
+  column       String    // "To Do", "In Progress", "Done"
+  position     Int       // Order within column
+  labels       Json?     // Array of { id, name, color }
+  dueDate      DateTime?
+  boardId      String
+  assigneeId   String?
+  linkedPageId String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  assignee    User?    @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  linkedPage  Page?    @relation(fields: [linkedPageId], references: [id], onDelete: SetNull)
+
+  @@index([boardId])
+  @@index([assigneeId])
+}
+
+// ==================== ACTIVITY LOG ====================
+model Activity {
+  id           String       @id @default(cuid())
+  type         ActivityType
+  userId       String
+  projectId    String
+  resourceId   String       // Page ID or Card ID
+  resourceType String       // "page" or "card"
+  action       String       // "created", "updated", "deleted", etc.
+  metadata     Json?        // Additional data
+  createdAt    DateTime     @default(now())
+
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum ActivityType {
+  PAGE_CREATED
+  PAGE_UPDATED
+  PAGE_DELETED
+  CARD_CREATED
+  CARD_UPDATED
+  CARD_MOVED
+  USER_MENTIONED
+  USER_ASSIGNED
+}
