@@ -12,6 +12,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useQuery } from "@tanstack/react-query";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import CollaborativeEditor from "@/components/CollaborativeEditor";
+import { ModeToggle } from "@/components/Modetoggle";
 
 interface Props {
   projectId: string;
@@ -48,22 +50,27 @@ export function EditorView({ projectId, pageId }: Props) {
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        <header className="h-16 border-b bg-white flex items-center px-8">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href={`/dashboard/${projectId}`}>
-                  Project
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Loading...</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+        <header className="h-16 border-b bg-white flex items-center justify-between px-2">
+          <div className="h-full flex items-center">
+            <SidebarTrigger className="" />
+            <Separator orientation="vertical" className="" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href={`/dashboard/${projectId}`}>
+                    Project
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Loading...</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+          <div>
+            <ModeToggle />
+          </div>
         </header>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-muted-foreground">Loading page...</p>
@@ -76,30 +83,36 @@ export function EditorView({ projectId, pageId }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="h-16 border-b bg-white dark:bg-background flex items-center px-8">
-        <SidebarTrigger className="-ml-1" />
-        <Separator
-          orientation="vertical"
-          className="mr-2 data-[orientation=vertical]:h-4"
-        />
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href={`/dashboard/${projectId}`}>
-                Project
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{page?.title || "Untitled Page"}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <header className="h-16 border-b bg-white dark:bg-background flex items-center  justify-between px-2">
+        <div className="h-full flex items-center">
+          <SidebarTrigger className="-ml-1" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-[orientation=vertical]:h-5"
+          />
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href={`/dashboard/${projectId}`}>
+                  Project
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>
+                  {page?.title || "Untitled Page"}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <div>
+          <ModeToggle />
+        </div>
       </header>
 
       <div className="flex-1 overflow-auto">
         <Suspense fallback={<div className="p-8">Loading editor...</div>}>
-          {/* Editor placeholder */}
           <div className="p-8">
             <div className="space-y-4">
               <h1 className="text-3xl font-bold">{page?.title}</h1>
@@ -110,12 +123,8 @@ export function EditorView({ projectId, pageId }: Props) {
                   : "Unknown date"}
               </p>
             </div>
+            <CollaborativeEditor />
           </div>
-
-          {/* Uncomment when ready for Liveblocks */}
-          {/* <Room roomId={roomId}>
-            <CollaborativeEditor pageId={pageId} projectId={projectId} />
-          </Room> */}
         </Suspense>
       </div>
     </div>
