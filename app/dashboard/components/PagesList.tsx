@@ -1,20 +1,47 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import Link from "next/link";
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
+} from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Plus, FileText, ChevronRight, Loader2 } from "lucide-react";
 
-interface Props {
-  projectId: string;
-}
-
-export function PagesList({ projectId }: Props) {
+export function PagesList() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentPageId = searchParams?.get("page");
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const params = useParams();
+  const projectId = (params?.projectId as string) || "";
+
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: pages, refetch } = useQuery({
     queryKey: ["pages", projectId],
@@ -24,19 +51,33 @@ export function PagesList({ projectId }: Props) {
     },
   });
 
-  const handleCreatePage = async (title: string) => {
+  const handleCreatePage = async () => {
+    if (!title.trim()) {
+      alert("Please enter a page title");
+      return;
+    }
+
+    setIsCreating(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/pages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, parentId: null }),
+        body: JSON.stringify({ title: title.trim(), parentId: null }),
       });
 
+      if (!res.ok) throw new Error("Failed to create page");
+
       const { page } = await res.json();
-      refetch();
+      await refetch();
+
+      setTitle("");
+      setOpen(false);
+
       router.push(`/dashboard/${projectId}?page=${page.id}`);
     } catch (error) {
+      console.error("Error:", error);
       alert("Error creating page");
+      setIsCreating(false);
     }
   };
 
@@ -45,89 +86,161 @@ export function PagesList({ projectId }: Props) {
       .filter((p) => !p.parentId)
       .map((page) => (
         <div key={page.id}>
-          <Button
-            onClick={() =>
-              router.push(`/dashboard/${projectId}?page=${page.id}`)
-            }
-            className={`w-full text-left px-4 py-2 rounded hover:bg-gray-100 ${
-              currentPageId === page.id
-                ? "bg-blue-100 text-blue-700 font-semibold"
-                : ""
-            }`}
-            style={{ paddingLeft: `${12 + level * 16}px` }}
-          >
-            📄 {page.title}
-          </Button>
-          {page.children?.length > 0 && renderPages(page.children, level + 1)}
+          {page.children?.length > 0 ? (
+            <Collapsible defaultOpen={false} className="group/collapsible">
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton
+                  onClick={() =>
+                    router.push(`/dashboard/${projectId}?page=${page.id}`)
+                  }
+                  className={`${
+                    currentPageId === page.id
+                      ? "bg-accent text-accent-foreground font-semibold"
+                      : ""
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>{page.title}</span>
+                  <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {page.children.map((child: any) => (
+                    <SidebarMenuSubItem key={child.id}>
+                      <SidebarMenuSubButton
+                        asChild
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/${projectId}?page=${child.id}`
+                          )
+                        }
+                        className={`${
+                          currentPageId === child.id
+                            ? "bg-accent text-accent-foreground font-semibold"
+                            : ""
+                        }`}
+                      >
+                        <div className="cursor-pointer">
+                          <FileText className="w-4 h-4" />
+                          <span>{child.title}</span>
+                        </div>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() =>
+                  router.push(`/dashboard/${projectId}?page=${page.id}`)
+                }
+                className={`${
+                  currentPageId === page.id
+                    ? "bg-accent text-accent-foreground font-semibold"
+                    : ""
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>{page.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </div>
       ));
   };
 
   return (
-    <div className="p-4 flex flex-col h-full">
-      <div className="mb-4">
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 text-sm font-semibold"
-        >
-          + New Page
-        </button>
+    <SidebarGroup>
+      <div className="flex items-center justify-between">
+        <SidebarGroupLabel>Pages</SidebarGroupLabel>
+
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerTrigger asChild>
+            <button
+              className="p-1 hover:bg-accent rounded transition-colors"
+              title="New Page"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </DrawerTrigger>
+
+          <DrawerContent>
+            <div className="w-full max-w-md mx-auto">
+              <DrawerHeader className="text-left">
+                <DrawerTitle className="text-2xl">Create New Page</DrawerTitle>
+                <DrawerDescription>
+                  Add a new page to your project.
+                </DrawerDescription>
+              </DrawerHeader>
+
+              <div className="space-y-4 px-4">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="page-title"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Page Title <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="page-title"
+                    placeholder="e.g., Getting Started"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    disabled={isCreating}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !isCreating && title.trim()) {
+                        handleCreatePage();
+                      }
+                    }}
+                    className="bg-background border border-input focus:ring-2 focus:ring-primary"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <DrawerFooter className="flex flex-row gap-3 pt-6">
+                <DrawerClose asChild>
+                  <Button
+                    variant="outline"
+                    disabled={isCreating}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </DrawerClose>
+                <Button
+                  onClick={handleCreatePage}
+                  disabled={isCreating || !title.trim()}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 dark:from-primary dark:to-purple-500 dark:hover:from-primary/90 dark:hover:to-purple-600 text-white"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Page
+                    </>
+                  )}
+                </Button>
+              </DrawerFooter>
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <SidebarMenu>
         {pages?.pages?.length > 0 ? (
           renderPages(pages.pages)
         ) : (
-          <p className="text-gray-500 text-sm">No pages yet</p>
+          <p className="text-sm text-muted-foreground p-2">No pages yet</p>
         )}
-      </div>
-
-      {showCreateModal && (
-        <CreatePageModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={handleCreatePage}
-        />
-      )}
-    </div>
-  );
-}
-
-function CreatePageModal({
-  onClose,
-  onCreate,
-}: {
-  onClose: () => void;
-  onCreate: (title: string) => void;
-}) {
-  const [title, setTitle] = useState("");
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg max-w-md w-full">
-        <h2 className="text-2xl font-bold mb-4">New Page</h2>
-        <input
-          type="text"
-          placeholder="Page title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full border p-2 mb-4 rounded"
-          autoFocus
-        />
-        <div className="flex gap-2">
-          <button
-            onClick={() => onCreate(title)}
-            className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-          >
-            Create
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 bg-gray-300 py-2 rounded hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+      </SidebarMenu>
+    </SidebarGroup>
   );
 }

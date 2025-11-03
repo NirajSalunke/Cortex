@@ -5,8 +5,12 @@ import { hasPermission, getUserProjectRole } from "@/lib/permissions";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const resolvedParams = await params;
+  console.log("📍 Full params:", params);
+  console.log("📍 projectId:", resolvedParams.projectId);
+
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -24,13 +28,13 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const role = await getUserProjectRole(user.id, params.projectId);
+    const role = await getUserProjectRole(user.id, resolvedParams.projectId);
     if (!role || !hasPermission(role, "create")) {
       console.log(
         "Forbidden: User lacks permission to create page in project",
         {
           userId: user.id,
-          projectId: params.projectId,
+          projectId: resolvedParams.projectId,
           role,
         }
       );
@@ -44,13 +48,13 @@ export async function POST(
       .toString(36)
       .substr(2, 9)}`;
 
-    const liveblocksRoomId = `project-${params.projectId}-page-${pageId}`;
+    const liveblocksRoomId = `project-${resolvedParams.projectId}-page-${pageId}`;
 
     const page = await prisma.page.create({
       data: {
         title,
         parentId,
-        projectId: params.projectId,
+        projectId: resolvedParams.projectId,
         authorId: user.id,
         liveblocksRoomId,
       },
@@ -60,7 +64,7 @@ export async function POST(
       data: {
         type: "PAGE_CREATED",
         userId: user.id,
-        projectId: params.projectId,
+        projectId: resolvedParams.projectId,
         resourceId: page.id,
         resourceType: "page",
         action: "created",
@@ -80,9 +84,10 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -94,16 +99,21 @@ export async function GET(
     });
 
     if (!user) {
+      console.log("User not found for clerkId:", userId);
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const role = await getUserProjectRole(user.id, params.projectId);
+    const role = await getUserProjectRole(user.id, resolvedParams.projectId);
     if (!role) {
+      console.log("Forbidden: User has no role in project", {
+        userId: user.id,
+        projectId: resolvedParams.projectId,
+      });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const pages = await prisma.page.findMany({
-      where: { projectId: params.projectId },
+      where: { projectId: resolvedParams.projectId },
       include: {
         author: { select: { id: true, name: true } },
         children: true,
@@ -111,6 +121,9 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
 
+    console.log(
+      `Fetched ${pages.length} pages for project ${resolvedParams.projectId}`
+    );
     return NextResponse.json({ pages, userRole: role });
   } catch (error) {
     console.error("Fetch pages error:", error);

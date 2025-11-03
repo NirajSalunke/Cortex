@@ -25,6 +25,8 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { ProjectSwitcher } from "@/app/dashboard/components/ProjectSwitcher";
+import { PagesList } from "@/app/dashboard/components/PagesList";
 
 // This is sample data.
 const data = {
@@ -162,11 +164,12 @@ export function AppSidebar1({
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <ProjectSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        <PagesList />
+        {/* <NavMain items={data.navMain} />
+        <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

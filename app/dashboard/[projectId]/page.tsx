@@ -1,20 +1,18 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { EditorView } from "../components/EditorView";
 
-interface Props {
-  params: { projectId: string };
-}
-
-export default function ProjectDashboard({ params }: Props) {
+export default function ProjectDashboard() {
   const searchParams = useSearchParams();
   const pageId = searchParams?.get("page");
+  console.log(useParams());
+  const projectId = (useParams()?.projectId as string) || "";
 
   return (
     <div className="flex-1 h-screen">
       {pageId ? (
-        <EditorView projectId={params.projectId} pageId={pageId} />
+        <EditorView projectId={projectId} pageId={pageId} />
       ) : (
         <div className="flex items-center justify-center h-full bg-linear-to-br from-gray-50 to-gray-100">
           <div className="text-center">
