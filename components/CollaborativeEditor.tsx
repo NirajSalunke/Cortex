@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useLiveblocksExtension } from "@liveblocks/react-tiptap";
+import { useThreads } from "@liveblocks/react";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { useQuery } from "@tanstack/react-query";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -11,7 +14,6 @@ import Highlight from "@tiptap/extension-highlight";
 import Color from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Placeholder from "@tiptap/extension-placeholder";
-import { useThreads } from "@liveblocks/react";
 
 import {
   Bold,
@@ -35,6 +37,7 @@ import {
   MoreVertical,
   X,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { useParams } from "next/navigation";
 
 const editorStyles = `
   .ProseMirror {
@@ -64,6 +68,12 @@ const editorStyles = `
 
   .ProseMirror:focus-visible {
     outline: none !important;
+  }
+
+  .ProseMirror.read-only {
+    opacity: 0.6;
+    pointer-events: none;
+    background-color: rgba(0, 0, 0, 0.02);
   }
 
   .ProseMirror p.is-editor-empty:first-child::before {
@@ -226,27 +236,46 @@ const COLORS = [
 ];
 
 const CollaborativeEditor = () => {
-  // ✅ Liveblocks extensions
+  const params = useParams();
+  const projectId = (params?.projectId as string) || "";
+  const { user: clerkUser } = useUser();
+
+  // ✅ Fetch current user's role
+  const { data: currentUserRole, isLoading: roleLoading } = useQuery({
+    queryKey: ["current-user-role", projectId],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/members`);
+      if (!response.ok) throw new Error("Failed to fetch members");
+      const members = await response.json();
+
+      // Find current user's role
+      const currentMember = members.find(
+        (m: any) => m.user.email === clerkUser?.emailAddresses[0]?.emailAddress
+      );
+
+      return currentMember?.role || "VIEWER";
+    },
+    enabled: !!clerkUser && !!projectId,
+  });
+
+  const isViewer = currentUserRole === "VIEWER";
   const liveblocks = useLiveblocksExtension();
   const { threads } = useThreads();
 
-  // ✅ NEW: Track loading state
   const [isLoading, setIsLoading] = useState(true);
-
-  // State
   const [fontSize, setFontSize] = useState("16");
   const [currentStyle, setCurrentStyle] = useState("paragraph");
   const [currentColor, setCurrentColor] = useState("#000000");
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [currentAlignment, setCurrentAlignment] = useState("left");
-  const [showThreads, setShowThreads] = useState(true);
 
-  // ✅ Editor with Liveblocks
+  // ✅ Editor with Liveblocks + Read-only mode for VIEWER
   const editor = useEditor({
+    editable: !isViewer, // ✅ Disable editing for VIEWER
     editorProps: {
       attributes: {
-        class: "focus:outline-none",
+        class: `focus:outline-none ${isViewer ? "read-only" : ""}`,
       },
     },
     extensions: [
@@ -265,13 +294,14 @@ const CollaborativeEditor = () => {
       Color,
       TextStyle,
       Placeholder.configure({
-        placeholder: "Start typing here...",
+        placeholder: isViewer
+          ? "You have read-only access to this document"
+          : "Start typing here...",
         emptyEditorClass: "is-editor-empty",
       }),
     ],
     content: "<p></p>",
     immediatelyRender: false,
-    // ✅ Set loaded when editor is ready
     onCreate: () => {
       setTimeout(() => setIsLoading(false), 500);
     },
@@ -345,8 +375,8 @@ const CollaborativeEditor = () => {
     return <AlignLeft className="w-4 h-4" />;
   };
 
-  // ✅ SHOW LOADING SCREEN
-  if (isLoading) {
+  // ✅ Show loading
+  if (isLoading || roleLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-background dark:to-background">
         <div className="text-center">
@@ -378,6 +408,40 @@ const CollaborativeEditor = () => {
     );
   }
 
+  // ✅ Show read-only message for VIEWER
+  if (isViewer) {
+    return (
+      <div className="h-full flex flex-col bg-gradient-to-b from-gray-50 to-white dark:from-background dark:to-background">
+        <style>{editorStyles}</style>
+
+        {/* Info Banner */}
+        <div className="border-b border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
+          <div className="max-w-5xl mx-auto px-8 py-3 flex items-center gap-3">
+            <Lock className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+            <div>
+              <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                Read-only Access
+              </p>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                You have view-only permissions for this document
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Editor */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-5xl mx-auto px-8 py-8">
+            <div className="bg-white dark:bg-background min-h-screen rounded-2xl border p-12 opacity-75">
+              <EditorContent editor={editor} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Regular editor for EDITOR/ADMIN
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-gray-50 to-white dark:from-background dark:to-background">
       <style>{editorStyles}</style>
@@ -392,7 +456,6 @@ const CollaborativeEditor = () => {
                 variant="ghost"
                 onClick={() => editor?.chain().focus().undo().run()}
                 className="hover:bg-gray-100 dark:hover:bg-gray-900"
-                disabled={isLoading}
               >
                 <Undo2 className="w-4 h-4" />
               </Button>
@@ -401,7 +464,6 @@ const CollaborativeEditor = () => {
                 variant="ghost"
                 onClick={() => editor?.chain().focus().redo().run()}
                 className="hover:bg-gray-100 dark:hover:bg-gray-900"
-                disabled={isLoading}
               >
                 <Redo2 className="w-4 h-4" />
               </Button>
@@ -414,7 +476,6 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900 text-sm font-normal"
-                    disabled={isLoading}
                   >
                     {currentStyle === "h1"
                       ? "Heading 1"
@@ -458,7 +519,6 @@ const CollaborativeEditor = () => {
                 className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
                   editor?.isActive("bold") ? "bg-gray-100 dark:bg-gray-900" : ""
                 }`}
-                disabled={isLoading}
               >
                 <Bold className="w-4 h-4" />
               </Button>
@@ -471,7 +531,6 @@ const CollaborativeEditor = () => {
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
-                disabled={isLoading}
               >
                 <Italic className="w-4 h-4" />
               </Button>
@@ -484,7 +543,6 @@ const CollaborativeEditor = () => {
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
-                disabled={isLoading}
               >
                 <UnderlineIcon className="w-4 h-4" />
               </Button>
@@ -495,7 +553,6 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900 relative"
-                    disabled={isLoading}
                   >
                     <Palette className="w-4 h-4" />
                     <div
@@ -537,7 +594,6 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900"
-                    disabled={isLoading}
                   >
                     {getAlignmentIcon()}
                   </Button>
@@ -573,7 +629,6 @@ const CollaborativeEditor = () => {
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
-                disabled={isLoading}
               >
                 <List className="w-4 h-4" />
               </Button>
@@ -588,7 +643,6 @@ const CollaborativeEditor = () => {
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
-                disabled={isLoading}
               >
                 <ListOrdered className="w-4 h-4" />
               </Button>
@@ -605,7 +659,6 @@ const CollaborativeEditor = () => {
                       ? "bg-blue-100 dark:bg-blue-900"
                       : ""
                   }`}
-                  disabled={isLoading}
                 >
                   <LinkIcon className="w-4 h-4" />
                 </Button>
@@ -651,7 +704,6 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900"
-                    disabled={isLoading}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>

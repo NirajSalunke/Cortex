@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ProjectSwitcher } from "@/app/dashboard/components/ProjectSwitcher";
 import { PagesList } from "@/app/dashboard/components/PagesList";
+import { TeamSection } from "./team-section";
 
 // This is sample data.
 const data = {
@@ -168,8 +169,7 @@ export function AppSidebar1({
       </SidebarHeader>
       <SidebarContent>
         <PagesList />
-        {/* <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} /> */}
+        <TeamSection />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
