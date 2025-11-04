@@ -34,6 +34,7 @@ import {
   Palette,
   MoreVertical,
   X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,13 +45,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 
@@ -200,7 +194,6 @@ const editorStyles = `
     color: #60a5fa;
   }
 
-  /* ✅ LIVEBLOCKS COLLABORATION STYLES */
   .collaboration-cursor__caret {
     border-left: 2px solid #0d0d0d;
     margin-left: -1px;
@@ -218,7 +211,6 @@ const editorStyles = `
     white-space: nowrap;
   }
 
-  /* Thread highlights */
   .lb-tiptap-comment-marker {
     background-color: rgba(255, 193, 7, 0.3);
   }
@@ -237,6 +229,9 @@ const CollaborativeEditor = () => {
   // ✅ Liveblocks extensions
   const liveblocks = useLiveblocksExtension();
   const { threads } = useThreads();
+
+  // ✅ NEW: Track loading state
+  const [isLoading, setIsLoading] = useState(true);
 
   // State
   const [fontSize, setFontSize] = useState("16");
@@ -261,7 +256,7 @@ const CollaborativeEditor = () => {
         bulletList: { HTMLAttributes: { class: "list-disc list-outside" } },
         orderedList: { HTMLAttributes: { class: "list-decimal list-outside" } },
         listItem: { HTMLAttributes: { class: "list-item" } },
-        history: false, // ✅ Liveblocks handles history
+        history: false,
       }),
       Underline,
       Link.configure({ openOnClick: true }),
@@ -276,6 +271,10 @@ const CollaborativeEditor = () => {
     ],
     content: "<p></p>",
     immediatelyRender: false,
+    // ✅ Set loaded when editor is ready
+    onCreate: () => {
+      setTimeout(() => setIsLoading(false), 500);
+    },
     onUpdate: ({ editor }) => {
       if (editor.isActive("heading", { level: 1 })) setCurrentStyle("h1");
       else if (editor.isActive("heading", { level: 2 })) setCurrentStyle("h2");
@@ -295,33 +294,35 @@ const CollaborativeEditor = () => {
     },
   });
 
-  if (!editor) return <div className="p-8 text-center">Loading editor...</div>;
-
   const applyFontSize = (size: string) => {
     setFontSize(size);
-    editor.chain().focus().setFontSize(`${size}px`).run();
+    editor
+      ?.chain()
+      .focus()
+      .setMark("textStyle", { fontSize: `${size}px` })
+      .run();
   };
 
   const handleStyleChange = (style: string) => {
-    if (style === "paragraph") editor.chain().focus().setParagraph().run();
+    if (style === "paragraph") editor?.chain().focus().setParagraph().run();
     else if (style === "h1")
-      editor.chain().focus().toggleHeading({ level: 1 }).run();
+      editor?.chain().focus().toggleHeading({ level: 1 }).run();
     else if (style === "h2")
-      editor.chain().focus().toggleHeading({ level: 2 }).run();
+      editor?.chain().focus().toggleHeading({ level: 2 }).run();
     else if (style === "h3")
-      editor.chain().focus().toggleHeading({ level: 3 }).run();
+      editor?.chain().focus().toggleHeading({ level: 3 }).run();
     setCurrentStyle(style);
   };
 
   const handleAlignment = (align: string) => {
-    editor.chain().focus().setTextAlign(align).run();
+    editor?.chain().focus().setTextAlign(align).run();
     setCurrentAlignment(align);
   };
 
   const handleAddLink = () => {
     if (linkUrl) {
       editor
-        .chain()
+        ?.chain()
         .focus()
         .extendMarkRange("link")
         .setLink({ href: linkUrl })
@@ -332,7 +333,7 @@ const CollaborativeEditor = () => {
   };
 
   const handleRemoveLink = () => {
-    editor.chain().focus().unsetLink().run();
+    editor?.chain().focus().unsetLink().run();
   };
 
   const getAlignmentIcon = () => {
@@ -344,8 +345,41 @@ const CollaborativeEditor = () => {
     return <AlignLeft className="w-4 h-4" />;
   };
 
+  // ✅ SHOW LOADING SCREEN
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-background dark:to-background">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Connecting to Liveblocks...
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            Syncing your document
+          </p>
+          <div className="flex justify-center gap-1">
+            <div
+              className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+              style={{ animationDelay: "0s" }}
+            />
+            <div
+              className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+              style={{ animationDelay: "0.1s" }}
+            />
+            <div
+              className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+              style={{ animationDelay: "0.2s" }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col bg-linear-to-b from-gray-50 to-white dark:from-background dark:to-background">
+    <div className="h-full flex flex-col bg-gradient-to-b from-gray-50 to-white dark:from-background dark:to-background">
       <style>{editorStyles}</style>
 
       {/* Toolbar */}
@@ -356,16 +390,18 @@ const CollaborativeEditor = () => {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().undo().run()}
+                onClick={() => editor?.chain().focus().undo().run()}
                 className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                disabled={isLoading}
               >
                 <Undo2 className="w-4 h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().redo().run()}
+                onClick={() => editor?.chain().focus().redo().run()}
                 className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                disabled={isLoading}
               >
                 <Redo2 className="w-4 h-4" />
               </Button>
@@ -378,6 +414,7 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900 text-sm font-normal"
+                    disabled={isLoading}
                   >
                     {currentStyle === "h1"
                       ? "Heading 1"
@@ -417,34 +454,37 @@ const CollaborativeEditor = () => {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().toggleBold().run()}
+                onClick={() => editor?.chain().focus().toggleBold().run()}
                 className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                  editor.isActive("bold") ? "bg-gray-100 dark:bg-gray-900" : ""
+                  editor?.isActive("bold") ? "bg-gray-100 dark:bg-gray-900" : ""
                 }`}
+                disabled={isLoading}
               >
                 <Bold className="w-4 h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().toggleItalic().run()}
+                onClick={() => editor?.chain().focus().toggleItalic().run()}
                 className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                  editor.isActive("italic")
+                  editor?.isActive("italic")
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
+                disabled={isLoading}
               >
                 <Italic className="w-4 h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                onClick={() => editor?.chain().focus().toggleUnderline().run()}
                 className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                  editor.isActive("underline")
+                  editor?.isActive("underline")
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
+                disabled={isLoading}
               >
                 <UnderlineIcon className="w-4 h-4" />
               </Button>
@@ -455,6 +495,7 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900 relative"
+                    disabled={isLoading}
                   >
                     <Palette className="w-4 h-4" />
                     <div
@@ -470,7 +511,7 @@ const CollaborativeEditor = () => {
                     <DropdownMenuItem
                       key={color}
                       onClick={() => {
-                        editor.chain().focus().setColor(color).run();
+                        editor?.chain().focus().setColor(color).run();
                         setCurrentColor(color);
                       }}
                       className={currentColor === color ? "bg-accent" : ""}
@@ -496,6 +537,7 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                    disabled={isLoading}
                   >
                     {getAlignmentIcon()}
                   </Button>
@@ -525,24 +567,28 @@ const CollaborativeEditor = () => {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                onClick={() => editor?.chain().focus().toggleBulletList().run()}
                 className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                  editor.isActive("bulletList")
+                  editor?.isActive("bulletList")
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
+                disabled={isLoading}
               >
                 <List className="w-4 h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                onClick={() =>
+                  editor?.chain().focus().toggleOrderedList().run()
+                }
                 className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                  editor.isActive("orderedList")
+                  editor?.isActive("orderedList")
                     ? "bg-gray-100 dark:bg-gray-900"
                     : ""
                 }`}
+                disabled={isLoading}
               >
                 <ListOrdered className="w-4 h-4" />
               </Button>
@@ -555,10 +601,11 @@ const CollaborativeEditor = () => {
                   variant="ghost"
                   onClick={() => setShowLinkInput(true)}
                   className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                    editor.isActive("link")
+                    editor?.isActive("link")
                       ? "bg-blue-100 dark:bg-blue-900"
                       : ""
                   }`}
+                  disabled={isLoading}
                 >
                   <LinkIcon className="w-4 h-4" />
                 </Button>
@@ -604,6 +651,7 @@ const CollaborativeEditor = () => {
                     size="sm"
                     variant="ghost"
                     className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                    disabled={isLoading}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>
@@ -613,7 +661,7 @@ const CollaborativeEditor = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() =>
-                      editor.chain().focus().toggleBlockquote().run()
+                      editor?.chain().focus().toggleBlockquote().run()
                     }
                   >
                     <Quote className="w-4 h-4 mr-2" />
@@ -621,7 +669,7 @@ const CollaborativeEditor = () => {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() =>
-                      editor.chain().focus().toggleCodeBlock().run()
+                      editor?.chain().focus().toggleCodeBlock().run()
                     }
                   >
                     <Code className="w-4 h-4 mr-2" />
@@ -630,10 +678,19 @@ const CollaborativeEditor = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {/* Status badge */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-600 rounded-full inline-block" />{" "}
+                Live
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Editor */}
       <div className="flex-1 overflow-hidden flex gap-4">
         <div className="flex-1 overflow-auto">
           <div className="max-w-5xl mx-auto px-8 py-8">
