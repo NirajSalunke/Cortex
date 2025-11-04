@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { useLiveblocksExtension } from "@liveblocks/react-tiptap";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -9,8 +10,9 @@ import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
 import Color from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
-import FontSize from "@tiptap/extension-font-size";
 import Placeholder from "@tiptap/extension-placeholder";
+import { useThreads } from "@liveblocks/react";
+
 import {
   Bold,
   Italic,
@@ -57,6 +59,7 @@ const editorStyles = `
     outline: none !important;
     border: none !important;
     box-shadow: none !important;
+    min-height: 400px;
   }
 
   .ProseMirror:focus {
@@ -161,7 +164,6 @@ const editorStyles = `
     color: #f3f4f6;
   }
 
-  /* ✅ HEADING STYLES */
   .ProseMirror h1 {
     font-size: 2rem;
     font-weight: bold;
@@ -197,6 +199,29 @@ const editorStyles = `
   .dark .ProseMirror a {
     color: #60a5fa;
   }
+
+  /* ✅ LIVEBLOCKS COLLABORATION STYLES */
+  .collaboration-cursor__caret {
+    border-left: 2px solid #0d0d0d;
+    margin-left: -1px;
+  }
+
+  .collaboration-cursor__label {
+    background-color: #0d0d0d;
+    color: white;
+    border-radius: 3px 3px 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    position: absolute;
+    top: -1.4em;
+    white-space: nowrap;
+  }
+
+  /* Thread highlights */
+  .lb-tiptap-comment-marker {
+    background-color: rgba(255, 193, 7, 0.3);
+  }
 `;
 
 const COLORS = [
@@ -209,13 +234,20 @@ const COLORS = [
 ];
 
 const CollaborativeEditor = () => {
+  // ✅ Liveblocks extensions
+  const liveblocks = useLiveblocksExtension();
+  const { threads } = useThreads();
+
+  // State
   const [fontSize, setFontSize] = useState("16");
   const [currentStyle, setCurrentStyle] = useState("paragraph");
   const [currentColor, setCurrentColor] = useState("#000000");
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [currentAlignment, setCurrentAlignment] = useState("left");
+  const [showThreads, setShowThreads] = useState(true);
 
+  // ✅ Editor with Liveblocks
   const editor = useEditor({
     editorProps: {
       attributes: {
@@ -223,41 +255,20 @@ const CollaborativeEditor = () => {
       },
     },
     extensions: [
+      liveblocks,
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
-        bulletList: {
-          HTMLAttributes: {
-            class: "list-disc list-outside",
-          },
-        },
-        orderedList: {
-          HTMLAttributes: {
-            class: "list-decimal list-outside",
-          },
-        },
-        listItem: {
-          HTMLAttributes: {
-            class: "list-item",
-          },
-        },
+        heading: { levels: [1, 2, 3] },
+        bulletList: { HTMLAttributes: { class: "list-disc list-outside" } },
+        orderedList: { HTMLAttributes: { class: "list-decimal list-outside" } },
+        listItem: { HTMLAttributes: { class: "list-item" } },
+        history: false, // ✅ Liveblocks handles history
       }),
       Underline,
-      Link.configure({
-        openOnClick: true,
-      }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-      Highlight.configure({
-        multicolor: true,
-      }),
+      Link.configure({ openOnClick: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Highlight.configure({ multicolor: true }),
       Color,
       TextStyle,
-      FontSize.configure({
-        types: ["textStyle"],
-      }),
       Placeholder.configure({
         placeholder: "Start typing here...",
         emptyEditorClass: "is-editor-empty",
@@ -266,35 +277,25 @@ const CollaborativeEditor = () => {
     content: "<p></p>",
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      if (editor.isActive("heading", { level: 1 })) {
-        setCurrentStyle("h1");
-      } else if (editor.isActive("heading", { level: 2 })) {
-        setCurrentStyle("h2");
-      } else if (editor.isActive("heading", { level: 3 })) {
-        setCurrentStyle("h3");
-      } else {
-        setCurrentStyle("paragraph");
-      }
+      if (editor.isActive("heading", { level: 1 })) setCurrentStyle("h1");
+      else if (editor.isActive("heading", { level: 2 })) setCurrentStyle("h2");
+      else if (editor.isActive("heading", { level: 3 })) setCurrentStyle("h3");
+      else setCurrentStyle("paragraph");
 
-      if (editor.isActive({ textAlign: "center" })) {
+      if (editor.isActive({ textAlign: "center" }))
         setCurrentAlignment("center");
-      } else if (editor.isActive({ textAlign: "right" })) {
+      else if (editor.isActive({ textAlign: "right" }))
         setCurrentAlignment("right");
-      } else if (editor.isActive({ textAlign: "justify" })) {
+      else if (editor.isActive({ textAlign: "justify" }))
         setCurrentAlignment("justify");
-      } else {
-        setCurrentAlignment("left");
-      }
+      else setCurrentAlignment("left");
 
-      // ✅ GET CURRENT TEXT COLOR
       const marks = editor.getAttributes("textStyle");
-      if (marks.color) {
-        setCurrentColor(marks.color);
-      }
+      if (marks.color) setCurrentColor(marks.color);
     },
   });
 
-  if (!editor) return <div>Loading editor...</div>;
+  if (!editor) return <div className="p-8 text-center">Loading editor...</div>;
 
   const applyFontSize = (size: string) => {
     setFontSize(size);
@@ -302,19 +303,14 @@ const CollaborativeEditor = () => {
   };
 
   const handleStyleChange = (style: string) => {
-    if (style === "paragraph") {
-      editor.chain().focus().setParagraph().run();
-      setCurrentStyle("paragraph");
-    } else if (style === "h1") {
+    if (style === "paragraph") editor.chain().focus().setParagraph().run();
+    else if (style === "h1")
       editor.chain().focus().toggleHeading({ level: 1 }).run();
-      setCurrentStyle("h1");
-    } else if (style === "h2") {
+    else if (style === "h2")
       editor.chain().focus().toggleHeading({ level: 2 }).run();
-      setCurrentStyle("h2");
-    } else if (style === "h3") {
+    else if (style === "h3")
       editor.chain().focus().toggleHeading({ level: 3 }).run();
-      setCurrentStyle("h3");
-    }
+    setCurrentStyle(style);
   };
 
   const handleAlignment = (align: string) => {
@@ -335,7 +331,6 @@ const CollaborativeEditor = () => {
     }
   };
 
-  // ✅ REMOVE LINK
   const handleRemoveLink = () => {
     editor.chain().focus().unsetLink().run();
   };
@@ -353,315 +348,298 @@ const CollaborativeEditor = () => {
     <div className="h-full flex flex-col bg-linear-to-b from-gray-50 to-white dark:from-background dark:to-background">
       <style>{editorStyles}</style>
 
+      {/* Toolbar */}
       <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-background sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-8">
-          <div className="flex items-center gap-0.5 py-2 flex-wrap">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().undo()}
-              className="hover:bg-gray-100 dark:hover:bg-gray-900"
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().redo()}
-              className="hover:bg-gray-100 dark:hover:bg-gray-900"
-              title="Redo (Ctrl+Y)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </Button>
-
-            <Separator orientation="vertical" className="mx-0.5 h-6" />
-
-            <Select value={fontSize} onValueChange={applyFontSize}>
-              <SelectTrigger className="w-16 h-8 border-0 shadow-none hover:bg-gray-100 dark:hover:bg-gray-900 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36].map((size) => (
-                  <SelectItem key={size} value={size.toString()}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="hover:bg-gray-100 dark:hover:bg-gray-900 text-sm font-normal"
-                >
-                  {currentStyle === "h1"
-                    ? "Heading 1"
-                    : currentStyle === "h2"
-                    ? "Heading 2"
-                    : currentStyle === "h3"
-                    ? "Heading 3"
-                    : "Normal text"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>Heading styles</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleStyleChange("h1")}>
-                  <Heading1 className="w-4 h-4 mr-2" />
-                  Heading 1
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleStyleChange("h2")}>
-                  <Heading2 className="w-4 h-4 mr-2" />
-                  Heading 2
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleStyleChange("h3")}>
-                  <Heading3 className="w-4 h-4 mr-2" />
-                  Heading 3
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => handleStyleChange("paragraph")}
-                >
-                  Paragraph
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Separator orientation="vertical" className="mx-0.5 h-6" />
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                editor.isActive("bold") ? "bg-gray-100 dark:bg-gray-900" : ""
-              }`}
-              title="Bold (Ctrl+B)"
-            >
-              <Bold className="w-4 h-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                editor.isActive("italic") ? "bg-gray-100 dark:bg-gray-900" : ""
-              }`}
-              title="Italic (Ctrl+I)"
-            >
-              <Italic className="w-4 h-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                editor.isActive("underline")
-                  ? "bg-gray-100 dark:bg-gray-900"
-                  : ""
-              }`}
-              title="Underline (Ctrl+U)"
-            >
-              <UnderlineIcon className="w-4 h-4" />
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="hover:bg-gray-100 dark:hover:bg-gray-900 relative"
-                  title="Text Color"
-                >
-                  <Palette className="w-4 h-4" />
-                  <div
-                    className="absolute bottom-0 right-0 w-2 h-2 rounded-full border border-gray-300"
-                    style={{ backgroundColor: currentColor }}
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>Text Color</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {COLORS.map(({ color, name }) => (
-                  <DropdownMenuItem
-                    key={color}
-                    onClick={() => {
-                      editor.chain().focus().setColor(color).run();
-                      setCurrentColor(color);
-                    }}
-                    className={currentColor === color ? "bg-accent" : ""}
-                  >
-                    <div
-                      className="w-4 h-4 rounded mr-2 border border-gray-300"
-                      style={{ backgroundColor: color }}
-                    />
-                    {name}
-                    {currentColor === color && (
-                      <span className="ml-auto text-xs">✓</span>
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Separator orientation="vertical" className="mx-0.5 h-6" />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="hover:bg-gray-100 dark:hover:bg-gray-900"
-                >
-                  {getAlignmentIcon()}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>Alignment</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleAlignment("left")}>
-                  <AlignLeft className="w-4 h-4 mr-2" />
-                  Left
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAlignment("center")}>
-                  <AlignCenter className="w-4 h-4 mr-2" />
-                  Center
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAlignment("right")}>
-                  <AlignRight className="w-4 h-4 mr-2" />
-                  Right
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAlignment("justify")}>
-                  <AlignJustify className="w-4 h-4 mr-2" />
-                  Justify
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                editor.isActive("bulletList")
-                  ? "bg-gray-100 dark:bg-gray-900"
-                  : ""
-              }`}
-              title="Bullet List"
-            >
-              <List className="w-4 h-4" />
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                editor.isActive("orderedList")
-                  ? "bg-gray-100 dark:bg-gray-900"
-                  : ""
-              }`}
-              title="Ordered List"
-            >
-              <ListOrdered className="w-4 h-4" />
-            </Button>
-
-            <Separator orientation="vertical" className="mx-0.5 h-6" />
-
-            {/* ✅ LINK WITH UI */}
-            {!showLinkInput ? (
+          <div className="flex items-center gap-0.5 py-2 flex-wrap justify-between">
+            <div className="flex items-center gap-0.5 flex-wrap">
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setShowLinkInput(true)}
-                className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
-                  editor.isActive("link") ? "bg-blue-100 dark:bg-blue-900" : ""
-                }`}
-                title="Add Link"
+                onClick={() => editor.chain().focus().undo().run()}
+                className="hover:bg-gray-100 dark:hover:bg-gray-900"
               >
-                <LinkIcon className="w-4 h-4" />
+                <Undo2 className="w-4 h-4" />
               </Button>
-            ) : (
-              <div className="flex items-center gap-1 px-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">
-                <Input
-                  type="url"
-                  placeholder="https://..."
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddLink();
-                    if (e.key === "Escape") setShowLinkInput(false);
-                  }}
-                  className="h-7 w-40 text-sm border-0 bg-transparent"
-                  autoFocus
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleAddLink}
-                  className="h-6 w-6 p-0"
-                  title="Apply Link"
-                >
-                  ✓
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowLinkInput(false);
-                    handleRemoveLink();
-                  }}
-                  className="h-6 w-6 p-0"
-                  title="Remove Link"
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              </div>
-            )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editor.chain().focus().redo().run()}
+                className="hover:bg-gray-100 dark:hover:bg-gray-900"
+              >
+                <Redo2 className="w-4 h-4" />
+              </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <Separator orientation="vertical" className="mx-0.5 h-6" />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="hover:bg-gray-100 dark:hover:bg-gray-900 text-sm font-normal"
+                  >
+                    {currentStyle === "h1"
+                      ? "Heading 1"
+                      : currentStyle === "h2"
+                      ? "Heading 2"
+                      : currentStyle === "h3"
+                      ? "Heading 3"
+                      : "Normal text"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Heading styles</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleStyleChange("h1")}>
+                    <Heading1 className="w-4 h-4 mr-2" />
+                    Heading 1
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleStyleChange("h2")}>
+                    <Heading2 className="w-4 h-4 mr-2" />
+                    Heading 2
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleStyleChange("h3")}>
+                    <Heading3 className="w-4 h-4 mr-2" />
+                    Heading 3
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleStyleChange("paragraph")}
+                  >
+                    Paragraph
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Separator orientation="vertical" className="mx-0.5 h-6" />
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
+                  editor.isActive("bold") ? "bg-gray-100 dark:bg-gray-900" : ""
+                }`}
+              >
+                <Bold className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
+                  editor.isActive("italic")
+                    ? "bg-gray-100 dark:bg-gray-900"
+                    : ""
+                }`}
+              >
+                <Italic className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
+                  editor.isActive("underline")
+                    ? "bg-gray-100 dark:bg-gray-900"
+                    : ""
+                }`}
+              >
+                <UnderlineIcon className="w-4 h-4" />
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="hover:bg-gray-100 dark:hover:bg-gray-900 relative"
+                  >
+                    <Palette className="w-4 h-4" />
+                    <div
+                      className="absolute bottom-0 right-0 w-2 h-2 rounded-full border border-gray-300"
+                      style={{ backgroundColor: currentColor }}
+                    />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Text Color</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {COLORS.map(({ color, name }) => (
+                    <DropdownMenuItem
+                      key={color}
+                      onClick={() => {
+                        editor.chain().focus().setColor(color).run();
+                        setCurrentColor(color);
+                      }}
+                      className={currentColor === color ? "bg-accent" : ""}
+                    >
+                      <div
+                        className="w-4 h-4 rounded mr-2 border border-gray-300"
+                        style={{ backgroundColor: color }}
+                      />
+                      {name}
+                      {currentColor === color && (
+                        <span className="ml-auto text-xs">✓</span>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Separator orientation="vertical" className="mx-0.5 h-6" />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                  >
+                    {getAlignmentIcon()}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Alignment</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleAlignment("left")}>
+                    <AlignLeft className="w-4 h-4 mr-2" />
+                    Left
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAlignment("center")}>
+                    <AlignCenter className="w-4 h-4 mr-2" />
+                    Center
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAlignment("right")}>
+                    <AlignRight className="w-4 h-4 mr-2" />
+                    Right
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAlignment("justify")}>
+                    <AlignJustify className="w-4 h-4 mr-2" />
+                    Justify
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
+                  editor.isActive("bulletList")
+                    ? "bg-gray-100 dark:bg-gray-900"
+                    : ""
+                }`}
+              >
+                <List className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
+                  editor.isActive("orderedList")
+                    ? "bg-gray-100 dark:bg-gray-900"
+                    : ""
+                }`}
+              >
+                <ListOrdered className="w-4 h-4" />
+              </Button>
+
+              <Separator orientation="vertical" className="mx-0.5 h-6" />
+
+              {!showLinkInput ? (
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                  onClick={() => setShowLinkInput(true)}
+                  className={`hover:bg-gray-100 dark:hover:bg-gray-900 ${
+                    editor.isActive("link")
+                      ? "bg-blue-100 dark:bg-blue-900"
+                      : ""
+                  }`}
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <LinkIcon className="w-4 h-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>More options</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() =>
-                    editor.chain().focus().toggleBlockquote().run()
-                  }
-                >
-                  <Quote className="w-4 h-4 mr-2" />
-                  Blockquote
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                >
-                  <Code className="w-4 h-4 mr-2" />
-                  Code
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              ) : (
+                <div className="flex items-center gap-1 px-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">
+                  <Input
+                    type="url"
+                    placeholder="https://..."
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddLink();
+                      if (e.key === "Escape") setShowLinkInput(false);
+                    }}
+                    className="h-7 w-40 text-sm border-0 bg-transparent"
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleAddLink}
+                    className="h-6 w-6 p-0"
+                  >
+                    ✓
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowLinkInput(false);
+                      handleRemoveLink();
+                    }}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="hover:bg-gray-100 dark:hover:bg-gray-900"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>More options</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() =>
+                      editor.chain().focus().toggleBlockquote().run()
+                    }
+                  >
+                    <Quote className="w-4 h-4 mr-2" />
+                    Blockquote
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      editor.chain().focus().toggleCodeBlock().run()
+                    }
+                  >
+                    <Code className="w-4 h-4 mr-2" />
+                    Code
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-8 py-8">
-          <div className="bg-white dark:bg-background min-h-screen rounded-2xl border p-12">
-            <EditorContent editor={editor} />
+      <div className="flex-1 overflow-hidden flex gap-4">
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-5xl mx-auto px-8 py-8">
+            <div className="bg-white dark:bg-background min-h-screen rounded-2xl border p-12">
+              <EditorContent editor={editor} />
+            </div>
           </div>
         </div>
       </div>

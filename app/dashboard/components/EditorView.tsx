@@ -12,8 +12,14 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useQuery } from "@tanstack/react-query";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import CollaborativeEditor from "@/components/CollaborativeEditor";
+// import CollaborativeEditor from "@/components/CollaborativeEditor";
 import { ModeToggle } from "@/components/Modetoggle";
+import {
+  ClientSideSuspense,
+  LiveblocksProvider,
+  RoomProvider,
+} from "@liveblocks/react";
+import TiptapEditor from "@/components/CollaborativeEditor";
 
 interface Props {
   projectId: string;
@@ -123,7 +129,13 @@ export function EditorView({ projectId, pageId }: Props) {
                   : "Unknown date"}
               </p>
             </div>
-            <CollaborativeEditor />
+            <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
+              <RoomProvider id={roomId}>
+                <ClientSideSuspense fallback={<div>Loading…</div>}>
+                  <TiptapEditor />
+                </ClientSideSuspense>
+              </RoomProvider>
+            </LiveblocksProvider>
           </div>
         </Suspense>
       </div>
