@@ -24,6 +24,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { ProjectSwitcher } from "@/app/dashboard/components/ProjectSwitcher";
 import { PagesList } from "@/app/dashboard/components/PagesList";
@@ -162,8 +163,46 @@ const data = {
 export function AppSidebar1({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
+  const { setOpen, open, state } = useSidebar();
+  const [isExpanded, setIsExpanded] = React.useState(true);
+
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [open, setOpen]);
+
+  // ✅ Auto-close when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const sidebar = document.querySelector("[data-sidebar='comments']");
+      const trigger = document.querySelector(
+        "[data-sidebar-trigger='comments']"
+      );
+
+      if (
+        sidebar &&
+        !sidebar.contains(e.target as Node) &&
+        trigger &&
+        !trigger.contains(e.target as Node) &&
+        open
+      ) {
+        setOpen(false);
+      }
+    };
+
+    if (open) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [open, setOpen]);
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="icon" variant="floating">
       <SidebarHeader>
         <ProjectSwitcher />
       </SidebarHeader>
@@ -174,24 +213,6 @@ export function AppSidebar1({
       <SidebarFooter>
         <NavUser />
       </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
-  );
-}
-
-export function AppSidebar2({
-  ...props
-}: React.ComponentProps<typeof Sidebar>) {
-  return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
-      </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
-      </SidebarContent>
-      <SidebarFooter></SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

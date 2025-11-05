@@ -129,7 +129,10 @@ export function EditorView({ projectId, pageId }: Props) {
                   : "Unknown date"}
               </p>
             </div>
-            <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
+            <LiveblocksProvider
+              throttle={16}
+              authEndpoint="/api/liveblocks-auth"
+            >
               <RoomProvider id={roomId}>
                 <ClientSideSuspense fallback={<div>Loading…</div>}>
                   <TiptapEditor />
