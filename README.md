@@ -1,3 +1,5 @@
+<img width="1913" height="1016" alt="image" src="https://github.com/user-attachments/assets/1e8df5aa-00f5-4e58-be11-03b1e7739613" />
+
 # Cortex
 
 Cortex is a modern project management and documentation tool that emphasizes **real-time, rich-text collaboration**, fluid Kanban interaction, intuitive multi-project navigation, and robust team/user management. Built using the latest full-stack technologies, Cortex offers a Google Docs–style editor, collaborative Kanban boards, and a developer-friendly architecture.
@@ -28,7 +30,7 @@ Cortex is a modern project management and documentation tool that emphasizes **r
 
 ## 🔧 Tech Stack
 
-- **Frontend:** React, Next.js, Shadcn/UI, TailwindCSS
+- **Frontend:** Next.js, Shadcn/UI, TailwindCSS
 - **Realtime Collaboration:** Liveblocks, Tiptap
 - **Auth:** Clerk
 - **Database/Backend:** PostgreSQL, Prisma ORM, RESTful Next.js API routes
