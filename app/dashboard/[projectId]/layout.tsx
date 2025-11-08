@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 
 interface LayoutProps {
   children: ReactNode;
-  params: { projectId: string };
+  // params: { projectId: string };
 }
 
-export default function DashboardLayout({ children, params }: LayoutProps) {
+export default function Layout({ children }: LayoutProps) {
   return (
     <SidebarProvider>
       <AppSidebar1 variant="floating" collapsible="icon" side="left" />

@@ -1,3 +1,4 @@
+"use client";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Link from "next/link";
 import { ShimmerButton } from "@/components/ui/shimmer-button";

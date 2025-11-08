@@ -1,4 +1,5 @@
-import Home from "@/pages/Home";
+import Home from "@/components/Home";
+export const dynamic = "force-dynamic"; // Add this line
 
 const page = () => {
   return (

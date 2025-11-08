@@ -566,9 +566,9 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
       description,
       column,
     }: {
-      title: string;
+      title?: string;
       description?: string;
-      column: string;
+      column?: string;
     }) => {
       const res = await fetch(
         `/api/projects/${projectId}/boards/${boardId}/cards`,

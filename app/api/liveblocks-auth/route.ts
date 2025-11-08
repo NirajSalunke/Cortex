@@ -48,9 +48,8 @@ export async function POST(request: NextRequest) {
     const session = liveblocks.prepareSession(user.id, {
       userInfo: {
         name: user.name || user.email,
-        email: user.email,
-        avatar: user.avatar,
-        role: member.role,
+        avatar: user.avatar || "",
+        color: "red",
       },
     });
 
