@@ -29,6 +29,7 @@ import {
 import { ProjectSwitcher } from "@/app/dashboard/components/ProjectSwitcher";
 import { PagesList } from "@/app/dashboard/components/PagesList";
 import { TeamSection } from "./team-section";
+import { BoardsList } from "@/app/dashboard/components/BoardList";
 
 // This is sample data.
 const data = {
@@ -166,6 +167,7 @@ export function AppSidebar1({
   const { setOpen, open, state } = useSidebar();
   const [isExpanded, setIsExpanded] = React.useState(true);
 
+  // ✅ Auto-close on Escape key
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && open) {
@@ -201,18 +203,24 @@ export function AppSidebar1({
       return () => document.removeEventListener("click", handleClickOutside);
     }
   }, [open, setOpen]);
+
   return (
-    <Sidebar collapsible="icon" variant="floating">
+    <Sidebar collapsible="icon" variant="floating" {...props}>
       <SidebarHeader>
         <ProjectSwitcher />
       </SidebarHeader>
-      <SidebarContent>
+
+      <SidebarContent className="flex flex-col gap-4">
         <PagesList />
+        <div className="h-px bg-border" />
+        <BoardsList />
+        <div className="h-px bg-border" />
         <TeamSection />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
       </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   );

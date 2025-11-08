@@ -246,7 +246,9 @@ export function TeamSection() {
               <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
             </div>
           ) : otherMembers?.length === 0 ? (
-            <p className="text-xs text-gray-500 py-2">No team members yet</p>
+            <p className="text-sm text-muted-foreground p-2">
+              No Team Members yet
+            </p>
           ) : (
             otherMembers?.map((member: any) => (
               <SidebarMenuItem key={member.id}>

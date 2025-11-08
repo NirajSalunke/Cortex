@@ -2,23 +2,27 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { EditorView } from "../components/EditorView";
+import KanbanView from "../components/KanbanView";
 
 export default function ProjectDashboard() {
   const searchParams = useSearchParams();
   const pageId = searchParams?.get("page");
-  console.log(useParams());
+  const boardId = searchParams?.get("board");
+
   const projectId = (useParams()?.projectId as string) || "";
 
   return (
     <div className="flex-1 h-screen">
       {pageId ? (
         <EditorView projectId={projectId} pageId={pageId} />
+      ) : boardId ? (
+        <KanbanView projectId={projectId} boardId={boardId} />
       ) : (
-        <div className="flex items-center justify-center h-full bg-linear-to-br from-gray-50 to-gray-100">
+        <div className="flex items-center justify-center h-full bg-gradient-to-br from-background to-muted">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">Welcome</h1>
-            <p className="text-gray-600">
-              Select a page from the left sidebar to start editing:
+            <h1 className="text-3xl font-bold text-foreground mb-4">Welcome</h1>
+            <p className="text-muted-foreground">
+              Select a page or board from the left sidebar to start
             </p>
           </div>
         </div>

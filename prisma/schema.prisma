@@ -5,12 +5,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Change to "mysql" or "sqlite" if needed
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // ==================== USER ====================
-
 model User {
   id            String    @id @default(cuid())
   clerkId       String    @unique
@@ -70,8 +69,8 @@ enum ProjectRole {
 model Page {
   id               String    @id @default(cuid())
   title            String
-  liveblocksRoomId String    @unique // Links to Liveblocks room
-  parentId         String?   // For nested pages
+  liveblocksRoomId String    @unique
+  parentId         String?
   projectId        String
   authorId         String
   createdAt        DateTime  @default(now())
@@ -89,12 +88,14 @@ model Page {
 
 // ==================== KANBAN BOARDS ====================
 model Board {
-  id         String   @id @default(cuid())
-  name       String
-  projectId  String
-  columns    Json     // Stores: ["To Do", "In Progress", "Done"]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  name               String
+  projectId          String
+  liveblocksRoomId   String   @unique  // ✅ For real-time sync
+  columns            Json     // Stores: ["To Do", "In Progress", "Done"]
+  order              Int      @default(0)  // ✅ For board ordering
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   cards      KanbanCard[]
@@ -107,9 +108,9 @@ model KanbanCard {
   id           String    @id @default(cuid())
   title        String
   description  String?
-  column       String    // "To Do", "In Progress", "Done"
-  position     Int       // Order within column
-  labels       Json?     // Array of { id, name, color }
+  column       String
+  position     Int
+  labels       Json?
   dueDate      DateTime?
   boardId      String
   assigneeId   String?
@@ -123,6 +124,7 @@ model KanbanCard {
 
   @@index([boardId])
   @@index([assigneeId])
+  @@index([boardId, column, position])  // ✅ Index instead of unique constraint
 }
 
 // ==================== ACTIVITY LOG ====================
@@ -132,8 +134,8 @@ model Activity {
   userId       String
   projectId    String
   resourceId   String       // Page ID or Card ID
-  resourceType String       // "page" or "card"
-  action       String       // "created", "updated", "deleted", etc.
+  resourceType String       // "page", "card", or "board"
+  action       String       // "created", "updated", "deleted", "moved"
   metadata     Json?        // Additional data
   createdAt    DateTime     @default(now())
 
@@ -149,9 +151,13 @@ enum ActivityType {
   PAGE_CREATED
   PAGE_UPDATED
   PAGE_DELETED
+  BOARD_CREATED
+  BOARD_UPDATED
+  BOARD_DELETED
   CARD_CREATED
   CARD_UPDATED
   CARD_MOVED
+  CARD_DELETED
   USER_MENTIONED
   USER_ASSIGNED
 }
