@@ -252,8 +252,7 @@ export function TeamSection() {
           ) : (
             otherMembers?.map((member: any) => (
               <SidebarMenuItem key={member.id}>
-                <div className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-sidebar-accent group">
-                  {/* Avatar */}
+                <div className="flex items-center gap-2 w-full pl-1 rounded-md  group">
                   <Avatar className="h-7 w-7 shrink-0">
                     <AvatarImage src={member.user.avatar} />
                     <AvatarFallback className="text-xs">

@@ -21,9 +21,20 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, GripVertical, Trash2, Loader2 } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, GripVertical, Trash2, Loader2, Edit2, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
+// TYPE DEFINITIONS
 interface Card {
   id: string;
   title: string;
@@ -31,6 +42,7 @@ interface Card {
   column: string;
   position: number;
   assignee?: any;
+  assigneeId?: string;
   dueDate?: string;
 }
 
@@ -39,28 +51,228 @@ interface KanbanBoardProps {
   projectId: string;
   boardId: string;
 }
-
 interface ColumnProps {
   column: string;
   cards: Card[];
-  onCreateCard: (column: string, title: string) => Promise<void>;
+  onCreateCard: (card: Partial<Card>) => Promise<void>;
   onDeleteCard: (cardId: string) => Promise<void>;
   projectId: string;
   boardId: string;
 }
 
-// ==================== KANBAN CARD COMPONENT ====================
+function CardDetailsDialog({
+  cardId,
+  open,
+  onOpenChange,
+  projectId,
+  boardId,
+}: {
+  cardId: string;
+  open: boolean;
+  onOpenChange: (val: boolean) => void;
+  projectId: string;
+  boardId: string;
+}) {
+  const queryClient = useQueryClient();
 
+  // Fetch fresh card data from API (optional, or use locally)
+  const { data: card, isLoading } = useQuery({
+    queryKey: ["card", cardId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/projects/${projectId}/boards/${boardId}/cards/${cardId}`
+      );
+      if (!res.ok) throw new Error("Failed to fetch card");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  // Edit mode
+  const [editMode, setEditMode] = useState(false);
+  const [form, setForm] = useState<Partial<Card>>({});
+  React.useEffect(() => {
+    if (card && open) {
+      setForm({
+        title: card.title,
+        description: card.description || "",
+        dueDate: card.dueDate || "",
+        assigneeId: card.assignee?.id || "",
+      });
+      setEditMode(false);
+    }
+  }, [card, open]);
+
+  const updateCardMutation = useMutation({
+    mutationFn: async (updates: Partial<Card>) => {
+      const res = await fetch(
+        `/api/projects/${projectId}/boards/${boardId}/cards/${cardId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to update card");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["card", cardId], data);
+      queryClient.invalidateQueries({
+        queryKey: ["board", projectId, boardId],
+      });
+      setEditMode(false);
+      onOpenChange(false);
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {editMode ? "Edit Card Details" : "Card Details"}
+          </DialogTitle>
+          <DialogDescription>
+            View and edit all details for this card.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : (
+          card && (
+            <>
+              {editMode ? (
+                <form
+                  className="space-y-6"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    updateCardMutation.mutate(form);
+                  }}
+                >
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Title
+                    </label>
+                    <Input
+                      value={form.title || ""}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, title: e.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      aria-label="description"
+                      value={form.description || ""}
+                      rows={4}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, description: e.target.value }))
+                      }
+                      className="w-full border rounded p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Due Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={form.dueDate ? form.dueDate.slice(0, 10) : ""}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, dueDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="submit"
+                      disabled={updateCardMutation.isPending}
+                    >
+                      {updateCardMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        "Save"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEditMode(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </DialogFooter>
+                </form>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <div className="text-lg font-semibold">{card.title}</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {card?.description || (
+                        <span className="italic">No description</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mb-2 flex items-center text-sm gap-4">
+                    <span>
+                      <span className="font-medium">Due:</span>{" "}
+                      {card?.dueDate ? (
+                        new Date(card.dueDate).toLocaleDateString()
+                      ) : (
+                        <span className="italic text-muted-foreground">
+                          No due date
+                        </span>
+                      )}
+                    </span>
+                    <span>
+                      <span className="font-medium">Assignee:</span>{" "}
+                      {card?.assignee?.name || (
+                        <span className="italic text-muted-foreground">
+                          None
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => setEditMode(true)}>
+                      <Edit2 className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                    <DialogClose asChild>
+                      <Button variant="outline">Close</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </>
+              )}
+            </>
+          )
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// --- KANBAN CARD COMPONENT --
 function KanbanCard({
   card,
   onDelete,
   isDeleting,
   isOverlay = false,
+  onDialogOpen,
 }: {
   card: Card;
   onDelete: (id: string) => void;
   isDeleting: boolean;
   isOverlay?: boolean;
+  onDialogOpen?: (id: string) => void;
 }) {
   const {
     attributes,
@@ -103,12 +315,15 @@ function KanbanCard({
     );
   }
 
+  // ⚡ Card is now clickable to open dialog
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-background border border-border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow group"
+      className="bg-background border border-border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
+      onClick={() => onDialogOpen?.(card.id)}
     >
+      {/* drag handle */}
       <div className="flex items-start gap-2">
         <div
           {...listeners}
@@ -117,7 +332,6 @@ function KanbanCard({
         >
           <GripVertical className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
         </div>
-
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-sm line-clamp-2 mb-2">
             {card.title}
@@ -127,7 +341,6 @@ function KanbanCard({
               {card.description}
             </p>
           )}
-
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1">
               {card.assignee && (
@@ -146,9 +359,11 @@ function KanbanCard({
             )}
           </div>
         </div>
-
         <button
-          onClick={() => onDelete(card.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(card.id);
+          }}
           disabled={isDeleting}
           className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity disabled:opacity-50"
         >
@@ -163,8 +378,7 @@ function KanbanCard({
   );
 }
 
-// ==================== COLUMN COMPONENT ====================
-
+// COLUMN COMPONENT
 function Column({
   column,
   cards,
@@ -174,9 +388,12 @@ function Column({
   boardId,
 }: ColumnProps) {
   const [isCreating, setIsCreating] = useState(false);
-  const [newCardTitle, setNewCardTitle] = useState("");
+  const [newCard, setNewCard] = useState({ title: "", description: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+
+  // Dialog state
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
   // ✅ Make the column droppable
   const { setNodeRef, isOver } = useDroppable({
@@ -190,12 +407,15 @@ function Column({
   const cardIds = useMemo(() => cards.map((card) => card.id), [cards]);
 
   const handleCreateCard = async () => {
-    if (!newCardTitle.trim()) return;
-
+    if (!newCard.title.trim()) return;
     setIsLoading(true);
     try {
-      await onCreateCard(column, newCardTitle);
-      setNewCardTitle("");
+      await onCreateCard({
+        title: newCard.title,
+        description: newCard.description,
+        column,
+      });
+      setNewCard({ title: "", description: "" });
       setIsCreating(false);
     } catch (error) {
       console.error("Error creating card:", error);
@@ -238,6 +458,7 @@ function Column({
                 card={card}
                 onDelete={handleDeleteCard}
                 isDeleting={deletingCardId === card.id}
+                onDialogOpen={(id) => setSelectedCard(id)}
               />
             ))
           ) : (
@@ -250,26 +471,31 @@ function Column({
             <div className="space-y-2 bg-background rounded-lg p-3 border border-border">
               <Input
                 placeholder="Card title..."
-                value={newCardTitle}
-                onChange={(e) => setNewCardTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isLoading) {
-                    handleCreateCard();
-                  }
-                  if (e.key === "Escape") {
-                    setIsCreating(false);
-                    setNewCardTitle("");
-                  }
-                }}
+                value={newCard.title}
+                onChange={(e) =>
+                  setNewCard((card) => ({ ...card, title: e.target.value }))
+                }
                 disabled={isLoading}
                 autoFocus
-                className="text-sm"
+                className="text-sm mb-2"
+              />
+              <textarea
+                placeholder="Description..."
+                value={newCard.description}
+                onChange={(e) =>
+                  setNewCard((card) => ({
+                    ...card,
+                    description: e.target.value,
+                  }))
+                }
+                className="text-sm w-full border rounded p-2 mb-2"
+                rows={2}
               />
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   onClick={handleCreateCard}
-                  disabled={!newCardTitle.trim() || isLoading}
+                  disabled={!newCard.title.trim() || isLoading}
                   className="flex-1"
                 >
                   {isLoading ? (
@@ -286,7 +512,7 @@ function Column({
                   variant="outline"
                   onClick={() => {
                     setIsCreating(false);
-                    setNewCardTitle("");
+                    setNewCard({ title: "", description: "" });
                   }}
                   className="flex-1"
                 >
@@ -305,12 +531,22 @@ function Column({
           )}
         </div>
       </SortableContext>
+      {selectedCard && (
+        <CardDetailsDialog
+          cardId={selectedCard}
+          open={!!selectedCard}
+          onOpenChange={(open) => {
+            if (!open) setSelectedCard(null);
+          }}
+          projectId={projectId}
+          boardId={boardId}
+        />
+      )}
     </div>
   );
 }
 
-// ==================== MAIN KANBAN BOARD ====================
-
+// --- MAIN KANBAN BOARD ---
 export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [activeCard, setActiveCard] = useState<Card | null>(null);
@@ -323,13 +559,16 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
     })
   );
 
+  // CREATE (with title/desc now)
   const createCardMutation = useMutation({
     mutationFn: async ({
-      column,
       title,
+      description,
+      column,
     }: {
-      column: string;
       title: string;
+      description?: string;
+      column: string;
     }) => {
       const res = await fetch(
         `/api/projects/${projectId}/boards/${boardId}/cards`,
@@ -338,64 +577,23 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title,
+            description,
             column,
             position: 0,
           }),
         }
       );
-
       if (!res.ok) throw new Error("Failed to create card");
       return res.json();
     },
-    onMutate: async ({ column, title }) => {
-      await queryClient.cancelQueries({
-        queryKey: ["board", projectId, boardId],
-      });
-
-      const previousBoard = queryClient.getQueryData([
-        "board",
-        projectId,
-        boardId,
-      ]);
-
-      queryClient.setQueryData(["board", projectId, boardId], (old: any) => {
-        if (!old) return old;
-
-        const tempId = `temp-${Date.now()}`;
-        const newCard = {
-          id: tempId,
-          title,
-          column,
-          position: 0,
-          description: null,
-          assignee: null,
-          dueDate: null,
-          createdAt: new Date().toISOString(),
-        };
-
-        return {
-          ...old,
-          cards: [newCard, ...old.cards],
-        };
-      });
-
-      return { previousBoard };
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousBoard) {
-        queryClient.setQueryData(
-          ["board", projectId, boardId],
-          context.previousBoard
-        );
-      }
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["board", projectId, boardId],
       });
     },
   });
 
+  // DELETE
   const deleteCardMutation = useMutation({
     mutationFn: async (cardId: string) => {
       const res = await fetch(
@@ -404,46 +602,17 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
           method: "DELETE",
         }
       );
-
       if (!res.ok) throw new Error("Failed to delete card");
       return res.json();
     },
-    onMutate: async (cardId) => {
-      await queryClient.cancelQueries({
-        queryKey: ["board", projectId, boardId],
-      });
-
-      const previousBoard = queryClient.getQueryData([
-        "board",
-        projectId,
-        boardId,
-      ]);
-
-      queryClient.setQueryData(["board", projectId, boardId], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          cards: old.cards.filter((card: Card) => card.id !== cardId),
-        };
-      });
-
-      return { previousBoard };
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousBoard) {
-        queryClient.setQueryData(
-          ["board", projectId, boardId],
-          context.previousBoard
-        );
-      }
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["board", projectId, boardId],
       });
     },
   });
 
+  // MOVE
   const moveCardMutation = useMutation({
     mutationFn: async ({
       cardId,
@@ -465,45 +634,10 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
           }),
         }
       );
-
       if (!res.ok) throw new Error("Failed to move card");
       return res.json();
     },
-    onMutate: async ({ cardId, newColumn, newPosition }) => {
-      await queryClient.cancelQueries({
-        queryKey: ["board", projectId, boardId],
-      });
-
-      const previousBoard = queryClient.getQueryData([
-        "board",
-        projectId,
-        boardId,
-      ]);
-
-      queryClient.setQueryData(["board", projectId, boardId], (old: any) => {
-        if (!old) return old;
-
-        const updatedCards = old.cards.map((card: Card) => {
-          if (card.id === cardId) {
-            return { ...card, column: newColumn, position: newPosition };
-          }
-          return card;
-        });
-
-        return { ...old, cards: updatedCards };
-      });
-
-      return { previousBoard };
-    },
-    onError: (err, variables, context) => {
-      if (context?.previousBoard) {
-        queryClient.setQueryData(
-          ["board", projectId, boardId],
-          context.previousBoard
-        );
-      }
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["board", projectId, boardId],
       });
@@ -513,101 +647,68 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const activeData = active.data.current;
-
     if (activeData?.type === "Card") {
       setActiveCard(activeData.card);
     }
   };
-
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
-
     const activeId = active.id;
     const overId = over.id;
-
     if (activeId === overId) return;
-
     const activeData = active.data.current;
     const overData = over.data.current;
-
     if (!activeData || activeData.type !== "Card") return;
-
     const activeCard = activeData.card;
     const allCards = board?.cards || [];
-
-    // ✅ Dragging over another card
-    if (overData?.type === "Card") {
-      const overCard = overData.card;
-
-      if (activeCard.column !== overCard.column) {
-        const overColumnCards = allCards.filter(
-          (c: Card) => c.column === overCard.column
-        );
-        const overIndex = overColumnCards.findIndex(
-          (c: Card) => c.id === overId
-        );
-
-        moveCardMutation.mutate({
-          cardId: activeCard.id,
-          newColumn: overCard.column,
-          newPosition: overIndex,
-        });
-      }
-    }
-
-    // ✅ Dragging over an empty column
-    if (overData?.type === "Column") {
-      const newColumn = overData.column;
-
-      if (activeCard.column !== newColumn) {
-        moveCardMutation.mutate({
-          cardId: activeCard.id,
-          newColumn: newColumn,
-          newPosition: 0,
-        });
-      }
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveCard(null);
-
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (activeId === overId) return;
-
-    const activeData = active.data.current;
-    const overData = over.data.current;
-
-    if (!activeData || activeData.type !== "Card") return;
-
-    const activeCard = activeData.card;
-    const allCards = board?.cards || [];
-
-    // Dragging over another card
     if (overData?.type === "Card") {
       const overCard = overData.card;
       const overColumnCards = allCards.filter(
         (c: Card) => c.column === overCard.column
       );
       const overIndex = overColumnCards.findIndex((c: Card) => c.id === overId);
-
       moveCardMutation.mutate({
         cardId: activeCard.id,
         newColumn: overCard.column,
         newPosition: overIndex,
       });
     }
-
-    // Dragging over a column
     if (overData?.type === "Column") {
       const newColumn = overData.column;
-
+      moveCardMutation.mutate({
+        cardId: activeCard.id,
+        newColumn: newColumn,
+        newPosition: 0,
+      });
+    }
+  };
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCard(null);
+    const { active, over } = event;
+    if (!over) return;
+    const activeId = active.id;
+    const overId = over.id;
+    if (activeId === overId) return;
+    const activeData = active.data.current;
+    const overData = over.data.current;
+    if (!activeData || activeData.type !== "Card") return;
+    const activeCard = activeData.card;
+    const allCards = board?.cards || [];
+    if (overData?.type === "Card") {
+      const overCard = overData.card;
+      const overColumnCards = allCards.filter(
+        (c: Card) => c.column === overCard.column
+      );
+      const overIndex = overColumnCards.findIndex((c: Card) => c.id === overId);
+      moveCardMutation.mutate({
+        cardId: activeCard.id,
+        newColumn: overCard.column,
+        newPosition: overIndex,
+      });
+    }
+    if (overData?.type === "Column") {
+      const newColumn = overData.column;
       moveCardMutation.mutate({
         cardId: activeCard.id,
         newColumn: newColumn,
@@ -633,15 +734,12 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
           const cardsInColumn = (board?.cards || [])
             .filter((card: any) => card.column === column)
             .sort((a: Card, b: Card) => a.position - b.position);
-
           return (
             <Column
               key={column}
               column={column}
               cards={cardsInColumn}
-              onCreateCard={(col, title) =>
-                createCardMutation.mutateAsync({ column: col, title })
-              }
+              onCreateCard={(card) => createCardMutation.mutateAsync(card)}
               onDeleteCard={(cardId) => deleteCardMutation.mutateAsync(cardId)}
               projectId={projectId}
               boardId={boardId}
@@ -649,7 +747,6 @@ export function KanbanBoard({ board, projectId, boardId }: KanbanBoardProps) {
           );
         })}
       </div>
-
       {typeof window !== "undefined" &&
         createPortal(
           <DragOverlay>
