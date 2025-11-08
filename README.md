@@ -122,11 +122,6 @@ text
 - Run `pnpm lint` before commits
 - All PRs should include description and screenshots/gifs for UI changes
 
----
-
-## 📄 License
-
-Currently not specified. Add a LICENSE file if open-source distribution is intended.
 
 ---
 
