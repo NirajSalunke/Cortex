@@ -6,6 +6,12 @@ Cortex is a modern project management and documentation tool that emphasizes **r
 
 ---
 
+## Demo Video
+
+Watch the full walkthrough of Cortex's features including real-time collaboration, Kanban boards, and document editing:
+
+[![Watch Demo](https://img.youtube.com/vi/Wh34mmWM57Q/0.jpg)](https://www.youtube.com/watch?v=Wh34mmWM57Q)
+
 ## 🚀 Features
 
 - **Real-time Collaborative Editing:**  
@@ -121,7 +127,6 @@ text
 - Use conventional commit messages (`feat:`, `fix:`, `chore:` etc.)
 - Run `pnpm lint` before commits
 - All PRs should include description and screenshots/gifs for UI changes
-
 
 ---
 
