@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
+import { ProjectMember } from "@prisma/client";
 
 export async function GET(
   req: NextRequest,
@@ -42,7 +43,9 @@ export async function GET(
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
     }
 
-    const isMember = board.project.members.some((m) => m.userId === user.id);
+    const isMember = board.project.members.some(
+      (m: ProjectMember) => m.userId === user.id
+    );
     if (!isMember) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
@@ -126,7 +129,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
     }
 
-    const member = board.project.members.find((m) => m.userId === user.id);
+    const member = board.project.members.find(
+      (m: ProjectMember) => m.userId === user.id
+    );
     if (!member) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
@@ -219,7 +224,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
     }
 
-    const member = board.project.members.find((m) => m.userId === user.id);
+    const member = board.project.members.find(
+      (m: ProjectMember) => m.userId === user.id
+    );
     if (!member) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
